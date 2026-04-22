@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: woxa_assessment
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d woxa_assessment"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+    environment:
+      PORT: 8080
+      DB_URL: postgres://postgres:postgres@db:5432/woxa_assessment
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  seed:
+    build:
+      context: ./server
+    profiles: ["tools"]
+    command: ["npm", "run", "seed"]
+    environment:
+      PORT: 8080
+      DB_URL: postgres://postgres:postgres@db:5432/woxa_assessment
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      BACKEND_PROTOCOL: http
+      BACKEND_HOST: server
+      BACKEND_PORT: 8080
+    depends_on:
+      server:
+        condition: service_started
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:

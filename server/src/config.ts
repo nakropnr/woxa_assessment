@@ -1,4 +1,8 @@
-process.loadEnvFile();
+import { existsSync } from "node:fs";
+
+if (process.env.NODE_ENV !== "production" && existsSync(".env")) {
+  process.loadEnvFile();
+}
 import type { MigrationConfig } from "drizzle-orm/migrator";
 
 type APIConfig = {

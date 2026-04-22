@@ -4,12 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npx tsc",
+    "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "npm run build && sh -c 'npx tsc --watch --preserveWatchOutput & node --watch dist/index.js'",
+    "dev": "npm run build && sh -c 'tsc --watch --preserveWatchOutput & node --watch dist/index.js'",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
-    "seed": "npm run build && node dist/db/seed.js",
+    "seed": "node dist/db/seed.js",
     "test": "npm run build && node --test dist/test/**/*.test.js"
   },
   "repository": {
@@ -26,13 +26,17 @@
   "homepage": "https://github.com/nakropnr/woxa_assessment#readme",
   "dependencies": {
     "cors": "^2.8.6",
+    "drizzle-orm": "^0.36.0",
     "express": "^5.2.1",
+    "postgres": "^3.4.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/node": "^24.12.2",
     "@types/supertest": "^7.2.0",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "typescript": "^5.5.0"
   }
 }

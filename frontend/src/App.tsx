@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { fetchBrokers, fetchBroker, createBroker } from "./api";
 import type { Broker, BrokerType } from "./types";
 
@@ -73,9 +73,43 @@ function ErrorBox({ message }: { message: string }) {
   );
 }
 
-type Page = "brokers" | "detail" | "submit";
+type AppRoute =
+  | { kind: "brokers" }
+  | { kind: "submit" }
+  | { kind: "detail"; slug: string };
 
-function Nav({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
+function getRouteFromLocation(pathname: string): AppRoute {
+  if (pathname === "/submit") {
+    return { kind: "submit" };
+  }
+
+  const detailMatch = pathname.match(/^\/brokers\/([^/]+)$/);
+  if (detailMatch) {
+    return { kind: "detail", slug: decodeURIComponent(detailMatch[1]) };
+  }
+
+  return { kind: "brokers" };
+}
+
+function getPathFromRoute(route: AppRoute) {
+  switch (route.kind) {
+    case "submit":
+      return "/submit";
+    case "detail":
+      return `/brokers/${encodeURIComponent(route.slug)}`;
+    case "brokers":
+    default:
+      return "/";
+  }
+}
+
+function Nav({
+  route,
+  onNavigate,
+}: {
+  route: AppRoute;
+  onNavigate: (route: AppRoute) => void;
+}) {
   return (
     <nav
       style={{
@@ -93,7 +127,7 @@ function Nav({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
       }}
     >
       <span
-        onClick={() => setPage("brokers")}
+        onClick={() => onNavigate({ kind: "brokers" })}
         style={{
           fontFamily: "'DM Serif Display', serif",
           fontSize: 20,
@@ -109,11 +143,15 @@ function Nav({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
         {["Brokers", "Markets", "Analysis", "Education"].map((label) => {
           const active =
             label === "Brokers" &&
-            (page === "brokers" || page === "detail" || page === "submit");
+            (route.kind === "brokers" ||
+              route.kind === "detail" ||
+              route.kind === "submit");
           return (
             <span
               key={label}
-              onClick={() => label === "Brokers" && setPage("brokers")}
+              onClick={() =>
+                label === "Brokers" && onNavigate({ kind: "brokers" })
+              }
               style={{
                 fontSize: 14,
                 fontWeight: 500,
@@ -315,11 +353,11 @@ function BrokerCard({
 }
 
 function BrokersPage({
-  setPage,
-  setSelectedSlug,
+  onOpenDetail,
+  onOpenSubmit,
 }: {
-  setPage: (p: Page) => void;
-  setSelectedSlug: (s: string) => void;
+  onOpenDetail: (slug: string) => void;
+  onOpenSubmit: () => void;
 }) {
   const [brokers, setBrokers] = useState<Broker[]>([]);
   const [loading, setLoading] = useState(true);
@@ -327,41 +365,30 @@ function BrokersPage({
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState<BrokerType | "">("");
   const [debounced, setDebounced] = useState("");
-  const requestIdRef = useRef(0);
 
   // Debounce search input by 400ms
   useEffect(() => {
-    const t = setTimeout(() => {
-      setDebounced(search);
-      setLoading(true);
-      setError("");
-    }, 400);
+    const t = setTimeout(() => setDebounced(search), 400);
     return () => clearTimeout(t);
   }, [search]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const requestId = ++requestIdRef.current;
-
-    fetchBrokers({ search: debounced, type: activeType, signal: controller.signal })
+    let cancelled = false;
+    fetchBrokers({ search: debounced, type: activeType })
       .then((data) => {
-        if (requestId === requestIdRef.current) {
+        if (!cancelled) {
           setBrokers(data);
-          setError("");
           setLoading(false);
         }
       })
       .catch((e) => {
-        if ((e as Error).name === "AbortError") {
-          return;
-        }
-        if (requestId === requestIdRef.current) {
+        if (!cancelled) {
           setError((e as Error).message);
           setLoading(false);
         }
       });
     return () => {
-      controller.abort();
+      cancelled = true;
     };
   }, [debounced, activeType]);
 
@@ -411,7 +438,11 @@ function BrokersPage({
         <span style={{ color: c.textDim, fontSize: 16 }}>⌕</span>
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setLoading(true);
+            setError("");
+          }}
           placeholder="Find brokers by name, region, or asset class..."
           style={{
             flex: 1,
@@ -496,7 +527,7 @@ function BrokersPage({
           className="fade-up-d3"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(3,1fr)",
             gap: 20,
           }}
         >
@@ -504,16 +535,13 @@ function BrokersPage({
             <BrokerCard
               key={b.id}
               broker={b}
-              onClick={() => {
-                setSelectedSlug(b.slug);
-                setPage("detail");
-              }}
+              onClick={() => onOpenDetail(b.slug)}
             />
           ))}
 
           {/* Partner CTA */}
           <div
-            onClick={() => setPage("submit")}
+            onClick={onOpenSubmit}
             style={{
               background: c.bgCard,
               border: `1px dashed ${c.border}`,
@@ -588,10 +616,10 @@ function BrokersPage({
 
 function DetailPage({
   slug,
-  setPage,
+  onNavigate,
 }: {
   slug: string;
-  setPage: (p: Page) => void;
+  onNavigate: (route: AppRoute) => void;
 }) {
   const [broker, setBroker] = useState<Broker | null>(null);
   const [loading, setLoading] = useState(true);
@@ -603,7 +631,6 @@ function DetailPage({
     fetchBroker(slug, { signal: controller.signal })
       .then((data) => {
         setBroker(data);
-        setError("");
       })
       .catch((e) => {
         if ((e as Error).name !== "AbortError") {
@@ -621,13 +648,55 @@ function DetailPage({
     };
   }, [slug]);
 
+  useEffect(() => {
+    const defaultTitle = "Woxa";
+    const metaDescription = document.querySelector(
+      'meta[name="description"]',
+    );
+    const previousTitle = document.title;
+    const previousDescription = metaDescription?.getAttribute("content") ?? "";
+
+    if (broker) {
+      document.title = `${broker.name} | Woxa`;
+      if (metaDescription) {
+        metaDescription.setAttribute(
+          "content",
+          broker.description || `Explore ${broker.name} on Woxa.`,
+        );
+      }
+    } else if (error) {
+      document.title = `Broker Not Found | Woxa`;
+      if (metaDescription) {
+        metaDescription.setAttribute(
+          "content",
+          `The requested broker could not be found on Woxa.`,
+        );
+      }
+    } else {
+      document.title = defaultTitle;
+      if (metaDescription) {
+        metaDescription.setAttribute(
+          "content",
+          "Discover institutional brokers on Woxa.",
+        );
+      }
+    }
+
+    return () => {
+      document.title = previousTitle || defaultTitle;
+      if (metaDescription) {
+        metaDescription.setAttribute("content", previousDescription);
+      }
+    };
+  }, [broker, error]);
+
   if (loading) return <Spinner />;
   if (error || !broker)
     return (
       <div style={{ maxWidth: 900, margin: "60px auto", padding: "0 24px" }}>
         <ErrorBox message={error || "Broker not found"} />
         <button
-          onClick={() => setPage("brokers")}
+          onClick={() => onNavigate({ kind: "brokers" })}
           style={{
             marginTop: 16,
             background: "transparent",
@@ -743,7 +812,7 @@ function DetailPage({
               </a>
             )}
             <button
-              onClick={() => setPage("brokers")}
+              onClick={() => onNavigate({ kind: "brokers" })}
               style={{
                 background: "transparent",
                 color: c.text,
@@ -766,11 +835,7 @@ function DetailPage({
         style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px 60px" }}
       >
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: 40,
-          }}
+          style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 40 }}
         >
           <div>
             <h2
@@ -795,7 +860,7 @@ function DetailPage({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gridTemplateColumns: "1fr 1fr",
                 gap: 16,
               }}
             >
@@ -911,7 +976,7 @@ type FormState = {
   broker_type: BrokerType | "";
 };
 
-function SubmitPage({ setPage }: { setPage: (p: Page) => void }) {
+function SubmitPage({ onNavigateHome }: { onNavigateHome: () => void }) {
   const [form, setForm] = useState<FormState>({
     name: "",
     slug: "",
@@ -1010,7 +1075,7 @@ function SubmitPage({ setPage }: { setPage: (p: Page) => void }) {
           Your broker has been registered successfully.
         </p>
         <button
-          onClick={() => setPage("brokers")}
+          onClick={onNavigateHome}
           style={{
             background: c.accent,
             border: "none",
@@ -1066,7 +1131,7 @@ function SubmitPage({ setPage }: { setPage: (p: Page) => void }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: "1fr 1fr",
             gap: 20,
             marginBottom: 24,
           }}
@@ -1097,7 +1162,7 @@ function SubmitPage({ setPage }: { setPage: (p: Page) => void }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gridTemplateColumns: "repeat(4,1fr)",
               gap: 10,
             }}
           >
@@ -1128,7 +1193,7 @@ function SubmitPage({ setPage }: { setPage: (p: Page) => void }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: "1fr 1fr",
             gap: 20,
             marginBottom: 24,
           }}
@@ -1170,7 +1235,7 @@ function SubmitPage({ setPage }: { setPage: (p: Page) => void }) {
         {/* Actions */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
           <button
-            onClick={() => setPage("brokers")}
+            onClick={onNavigateHome}
             style={{
               background: "transparent",
               border: "none",
@@ -1209,8 +1274,28 @@ function SubmitPage({ setPage }: { setPage: (p: Page) => void }) {
 // ─── APP ROOT ─────────────────────────────────────────────────────
 
 export default function App() {
-  const [page, setPage] = useState<Page>("brokers");
-  const [selectedSlug, setSelectedSlug] = useState("");
+  const [route, setRoute] = useState<AppRoute>(() =>
+    getRouteFromLocation(window.location.pathname),
+  );
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setRoute(getRouteFromLocation(window.location.pathname));
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  const navigate = (nextRoute: AppRoute) => {
+    const nextPath = getPathFromRoute(nextRoute);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+    setRoute(nextRoute);
+  };
 
   return (
     <>
@@ -1218,15 +1303,24 @@ export default function App() {
       <div
         style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
       >
-        <Nav page={page} setPage={setPage} />
+        <Nav route={route} onNavigate={navigate} />
         <main style={{ flex: 1 }}>
-          {page === "brokers" && (
-            <BrokersPage setPage={setPage} setSelectedSlug={setSelectedSlug} />
+          {route.kind === "brokers" && (
+            <BrokersPage
+              onOpenDetail={(slug) => navigate({ kind: "detail", slug })}
+              onOpenSubmit={() => navigate({ kind: "submit" })}
+            />
           )}
-          {page === "detail" && (
-            <DetailPage key={selectedSlug} slug={selectedSlug} setPage={setPage} />
+          {route.kind === "detail" && (
+            <DetailPage
+              key={route.slug}
+              slug={route.slug}
+              onNavigate={navigate}
+            />
           )}
-          {page === "submit" && <SubmitPage setPage={setPage} />}
+          {route.kind === "submit" && (
+            <SubmitPage onNavigateHome={() => navigate({ kind: "brokers" })} />
+          )}
         </main>
         <Footer />
       </div>

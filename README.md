@@ -99,3 +99,37 @@ cd frontend
 npm install
 npm run dev
 ```
+
+## Docker
+
+This project can also run with Docker Compose.
+
+Start all services:
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8080`
+- PostgreSQL: `localhost:5432`
+
+Seed sample broker data after the containers are up:
+
+```bash
+docker compose --profile tools run --rm seed
+```
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+Stop the stack and remove database data:
+
+```bash
+docker compose down -v
+```
