@@ -493,29 +493,36 @@ function BrokersPage({
         >
           ASSET FOCUS:
         </span>
-        {FILTER_TYPES.map((f) => (
-          <button
-            key={f.label}
-            onClick={() => {
-              setActiveType(f.value);
-              setLoading(true);
-              setError("");
-            }}
-            style={{
-              background: activeType === f.value ? c.text : "transparent",
-              color: activeType === f.value ? c.bg : c.textMuted,
-              border: `1px solid ${activeType === f.value ? c.text : c.border}`,
-              borderRadius: 20,
-              padding: "5px 14px",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s",
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
+        <select
+          value={activeType}
+          onChange={(event) => {
+            setActiveType(event.target.value as BrokerType | "");
+            setLoading(true);
+            setError("");
+          }}
+          style={{
+            minWidth: 180,
+            background: c.bgInput,
+            color: c.text,
+            border: `1px solid ${c.border}`,
+            borderRadius: 10,
+            padding: "10px 14px",
+            fontSize: 13,
+            fontWeight: 500,
+            outline: "none",
+            cursor: "pointer",
+          }}
+        >
+          {FILTER_TYPES.map((f) => (
+            <option
+              key={f.label}
+              value={f.value}
+              style={{ background: c.bgCard, color: c.text }}
+            >
+              {f.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && <ErrorBox message={error} />}
