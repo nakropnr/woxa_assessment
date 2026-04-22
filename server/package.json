@@ -1,0 +1,38 @@
+{
+  "name": "woxa_assessment",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx tsc",
+    "start": "node dist/index.js",
+    "dev": "npm run build && sh -c 'npx tsc --watch --preserveWatchOutput & node --watch dist/index.js'",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "seed": "npm run build && node dist/db/seed.js",
+    "test": "npm run build && node --test dist/test/**/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nakropnr/woxa_assessment.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/nakropnr/woxa_assessment/issues"
+  },
+  "homepage": "https://github.com/nakropnr/woxa_assessment#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2"
+  }
+}
